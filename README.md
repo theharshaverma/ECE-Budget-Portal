@@ -1,16 +1,73 @@
-# React + Vite
+# ECE Budget Portal
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Initial prototype of the ECE Budget Portal developed to facilitate budget tracking and management activities within the ECE department.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Budget Dashboard
+  - Displays allocated, spent, and remaining budget.
+  - Visual overview of budget utilization.
 
-## React Compiler
+- Expense Management
+  - Add and track departmental expenses.
+  - Maintain records of expenditure details.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- Invoice Management
+  - View and organize invoice information.
+  - Track payment status and associated records.
 
-## Expanding the ESLint configuration
+- Inventory Management
+  - Maintain a list of purchased items and resources.
+  - Monitor quantity and availability.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Tech Stack
+
+- React
+- Vite
+- React Router DOM
+- CSS
+
+## Project Structure
+
+```
+src/
+├── pages/
+│   ├── Dashboard.jsx
+│   ├── AddExpense.jsx
+│   ├── Invoices.jsx
+│   └── Inventory.jsx
+├── App.jsx
+├── main.jsx
+└── data.js
+```
+
+## Getting Started
+
+1. Clone the repository:
+
+```bash
+git clone https://github.com/theharshaverma/ECE-Budget-Portal.git
+```
+
+2. Navigate to the project directory:
+
+```bash
+cd ECE-Budget-Portal
+```
+
+3. Install dependencies:
+
+```bash
+npm install
+```
+
+4. Start the development server:
+
+```bash
+npm run dev
+```
+
+## Status
+
+This repository currently contains the **initial prototype**. Additional requirements, workflows, and database integration will be incorporated after discussions with the ECE administration.
+
