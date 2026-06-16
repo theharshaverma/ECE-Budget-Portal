@@ -25,6 +25,15 @@ function Dashboard() {
           Department of Electronics and Communication Engineering
         </p>
 
+        <div style={yearBox}>
+          <label style={yearLabel}>Financial Year:</label>
+          <select style={yearSelect}>
+            <option>2024–2025</option>
+            <option>2025–2026</option>
+            <option>2026–2027</option>
+          </select>
+        </div>
+
         <div style={summaryGrid}>
           <div style={summaryCard}>
             <p style={labelStyle}>Total Budget</p>
@@ -49,6 +58,8 @@ function Dashboard() {
           <button style={outlineButton}>Inventory</button>
         </div>
 
+        <p style={lastUpdated}>Last Updated: 16 June 2026</p>
+
         <h2 style={sectionTitle}>Budget Summary</h2>
 
         <table style={tableStyle}>
@@ -59,6 +70,7 @@ function Dashboard() {
               <th style={thStyle}>Spent</th>
               <th style={thStyle}>Remaining</th>
               <th style={thStyle}>Utilization</th>
+              <th style={thStyle}>Actions</th>
             </tr>
           </thead>
 
@@ -73,9 +85,7 @@ function Dashboard() {
                   <td style={tdStyle}>{budget.head}</td>
                   <td style={tdStyle}>{formatMoney(budget.allocated)}</td>
                   <td style={tdStyle}>{formatMoney(budget.spent)}</td>
-                  <td style={{ ...tdStyle, color: "#15803d", fontWeight: "700" }}>
-                    {formatMoney(budget.remaining)}
-                  </td>
+                  <td style={remainingStyle}>{formatMoney(budget.remaining)}</td>
                   <td style={tdStyle}>
                     <div style={progressOuter}>
                       <div
@@ -87,6 +97,9 @@ function Dashboard() {
                     </div>
                     <span>{utilization}%</span>
                   </td>
+                  <td style={tdStyle}>
+                    <button style={smallButton}>Edit</button>
+                  </td>
                 </tr>
               );
             })}
@@ -95,10 +108,11 @@ function Dashboard() {
               <td style={tdStyle}>Total</td>
               <td style={tdStyle}>{formatMoney(totalAllocated)}</td>
               <td style={tdStyle}>{formatMoney(totalSpent)}</td>
-              <td style={tdStyle}>{formatMoney(totalRemaining)}</td>
+              <td style={remainingStyle}>{formatMoney(totalRemaining)}</td>
               <td style={tdStyle}>
                 {Math.round((totalSpent / totalAllocated) * 100)}%
               </td>
+              <td style={tdStyle}>-</td>
             </tr>
           </tbody>
         </table>
@@ -116,9 +130,11 @@ const pageStyle = {
 
 const cardContainer = {
   background: "#ffffff",
-  padding: "35px",
+  padding: "30px 40px",
   borderRadius: "16px",
   boxShadow: "0 8px 24px rgba(22, 101, 52, 0.15)",
+  maxWidth: "1500px",
+  margin: "0 auto",
 };
 
 const titleStyle = {
@@ -138,7 +154,27 @@ const deptStyle = {
   color: "#15803d",
   fontWeight: "600",
   textAlign: "center",
-  marginBottom: "30px",
+  marginBottom: "18px",
+};
+
+const yearBox = {
+  textAlign: "center",
+  marginBottom: "28px",
+};
+
+const yearLabel = {
+  marginRight: "10px",
+  fontWeight: "600",
+  color: "#14532d",
+};
+
+const yearSelect = {
+  padding: "8px 12px",
+  borderRadius: "8px",
+  border: "1px solid #15803d",
+  color: "#14532d",
+  background: "#ffffff",
+  fontWeight: "600",
 };
 
 const summaryGrid = {
@@ -172,7 +208,7 @@ const buttonRow = {
   display: "flex",
   justifyContent: "center",
   gap: "12px",
-  marginBottom: "30px",
+  marginBottom: "18px",
   flexWrap: "wrap",
 };
 
@@ -194,6 +230,13 @@ const outlineButton = {
   color: "#15803d",
   cursor: "pointer",
   fontWeight: "600",
+};
+
+const lastUpdated = {
+  textAlign: "right",
+  color: "#6b7280",
+  marginBottom: "20px",
+  fontSize: "14px",
 };
 
 const sectionTitle = {
@@ -226,6 +269,12 @@ const tdStyle = {
   fontWeight: "500",
 };
 
+const remainingStyle = {
+  ...tdStyle,
+  color: "#15803d",
+  fontWeight: "700",
+};
+
 const totalRow = {
   background: "#f0fdf4",
   fontWeight: "700",
@@ -245,6 +294,15 @@ const progressInner = {
   height: "100%",
   background: "#15803d",
   borderRadius: "20px",
+};
+
+const smallButton = {
+  padding: "6px 12px",
+  border: "none",
+  borderRadius: "6px",
+  background: "#15803d",
+  color: "white",
+  cursor: "pointer",
 };
 
 export default Dashboard;
