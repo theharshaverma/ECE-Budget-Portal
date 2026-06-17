@@ -136,4 +136,4 @@ requirements.
 
 ## Status
 
-This repository currently contains a working local prototype with a Node.js API. The JSON storage can later be replaced with PostgreSQL/MySQL when deployment requirements are finalized.
+This repository currently contains a working local prototype with a Node.js API. The JSON storage can later be replaced with PostgreSQL/MySQL when deployment requirements are finalized
