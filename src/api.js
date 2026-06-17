@@ -1,4 +1,5 @@
-const API_BASE_URL = "http://127.0.0.1:4000";
+export const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:4000";
 const TOKEN_KEY = "ece-budget-token";
 
 export function getToken() {
@@ -64,6 +65,19 @@ export async function createRecord(path, payload) {
   return request(path, {
     method: "POST",
     body: JSON.stringify(payload),
+  });
+}
+
+export async function updateRecord(path, id, payload) {
+  return request(`${path}/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteRecord(path, id) {
+  return request(`${path}/${id}`, {
+    method: "DELETE",
   });
 }
 

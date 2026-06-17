@@ -20,6 +20,21 @@ const collectionByPath = {
   "/api/inventory": "inventory",
 };
 
+function getCollectionRoute(pathname) {
+  for (const [basePath, collection] of Object.entries(collectionByPath)) {
+    if (pathname === basePath) {
+      return { basePath, collection, id: null };
+    }
+
+    if (pathname.startsWith(`${basePath}/`)) {
+      const id = Number(pathname.replace(`${basePath}/`, ""));
+      return Number.isInteger(id) && id > 0 ? { basePath, collection, id } : null;
+    }
+  }
+
+  return null;
+}
+
 function readDb() {
   return JSON.parse(readFileSync(dbPath, "utf8"));
 }
@@ -126,6 +141,54 @@ function requireAdmin(req, res) {
 
 function nextId(records) {
   return records.reduce((max, record) => Math.max(max, Number(record.id)), 0) + 1;
+}
+
+function requireText(value, fieldName) {
+  if (!String(value || "").trim()) {
+    throw new Error(`${fieldName} is required`);
+  }
+}
+
+function requirePositiveNumber(value, fieldName) {
+  if (!Number.isFinite(Number(value)) || Number(value) <= 0) {
+    throw new Error(`${fieldName} must be greater than zero`);
+  }
+}
+
+function requireNonNegativeNumber(value, fieldName) {
+  if (!Number.isFinite(Number(value)) || Number(value) < 0) {
+    throw new Error(`${fieldName} must be zero or greater`);
+  }
+}
+
+function requireDate(value, fieldName) {
+  if (!String(value || "").trim() || Number.isNaN(Date.parse(value))) {
+    throw new Error(`${fieldName} must be a valid date`);
+  }
+}
+
+function validateRecord(collection, body) {
+  if (collection === "income") {
+    requireText(body.budgetHead || body.source, "Budget head");
+    requirePositiveNumber(body.amount, "Amount");
+  }
+
+  if (collection === "expenses") {
+    requireText(body.head, "Budget head");
+    requireText(body.vendor || "ECE Department", "Vendor");
+    requireDate(body.date || "2026-04-01", "Date");
+    requireNonNegativeNumber(body.amount, "Amount");
+    requireText(body.status, "Status");
+  }
+
+  if (collection === "inventory") {
+    requireText(body.item, "Item name");
+    requireText(body.category, "Category");
+    requirePositiveNumber(body.quantity, "Quantity");
+    requireText(body.location, "Location");
+    requireDate(body.purchaseDate, "Purchase date");
+    requirePositiveNumber(body.amount, "Purchase amount");
+  }
 }
 
 function publicUser(user) {
@@ -247,14 +310,16 @@ async function handleRequest(req, res) {
     return;
   }
 
-  const collection = collectionByPath[pathname];
+  const route = getCollectionRoute(pathname);
 
-  if (!collection) {
+  if (!route) {
     sendError(res, 404, "Route not found");
     return;
   }
 
-  if (req.method === "GET") {
+  const { collection, id } = route;
+
+  if (req.method === "GET" && id === null) {
     const user = requireUser(req, res);
     if (!user) return;
 
@@ -263,12 +328,13 @@ async function handleRequest(req, res) {
     return;
   }
 
-  if (req.method === "POST") {
+  if (req.method === "POST" && id === null) {
     const user = requireAdmin(req, res);
     if (!user) return;
 
     const db = readDb();
     const body = await parseBody(req);
+    validateRecord(collection, body);
     const record = {
       id: nextId(db[collection]),
       ...body,
@@ -279,6 +345,52 @@ async function handleRequest(req, res) {
     db[collection] = [record, ...db[collection]];
     writeDb(db);
     sendJson(res, 201, record);
+    return;
+  }
+
+  if (req.method === "PUT" && id !== null) {
+    const user = requireAdmin(req, res);
+    if (!user) return;
+
+    const db = readDb();
+    const index = db[collection].findIndex((record) => Number(record.id) === id);
+
+    if (index === -1) {
+      sendError(res, 404, "Record not found");
+      return;
+    }
+
+    const body = await parseBody(req);
+    const record = {
+      ...db[collection][index],
+      ...body,
+      id,
+      updatedBy: user.username,
+      updatedAt: new Date().toISOString(),
+    };
+
+    validateRecord(collection, record);
+    db[collection][index] = record;
+    writeDb(db);
+    sendJson(res, 200, record);
+    return;
+  }
+
+  if (req.method === "DELETE" && id !== null) {
+    const user = requireAdmin(req, res);
+    if (!user) return;
+
+    const db = readDb();
+    const existingLength = db[collection].length;
+    db[collection] = db[collection].filter((record) => Number(record.id) !== id);
+
+    if (db[collection].length === existingLength) {
+      sendError(res, 404, "Record not found");
+      return;
+    }
+
+    writeDb(db);
+    sendJson(res, 200, { ok: true });
     return;
   }
 

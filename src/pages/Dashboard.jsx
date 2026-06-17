@@ -15,17 +15,17 @@ function Dashboard({ isAdmin, incomeRecords, expenseRecords, inventoryItems }) {
     {
       title: "Institute's Accumulated Income",
       description:
-        "Track all institute allocations, recoveries and department income for ECE.",
+        "Track official ECE accumulated budget heads, sanctioned amount and utilization.",
       metric: currency.format(totalIncome),
-      label: `${incomeRecords.length} income records`,
+      label: `${incomeRecords.length} budget heads`,
       link: "/accumulated-income",
     },
     {
       title: "Expenditure Budget",
       description:
-        "Manage budget utilization, vendor payments and uploaded invoices.",
+        "Manage 2026-27 expenditure particulars, utilization, balance and invoices.",
       metric: currency.format(totalExpense),
-      label: `${expenseRecords.length} expenditure records`,
+      label: `${expenseRecords.length} expenditure heads`,
       link: "/expenditure-budget",
     },
     {

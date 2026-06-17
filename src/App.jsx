@@ -7,10 +7,12 @@ import Invoices from "./pages/Invoices";
 import {
   clearToken,
   createRecord,
+  deleteRecord,
   getCurrentUser,
   getRecords,
   getToken,
   login,
+  updateRecord,
   uploadInvoice,
 } from "./api";
 
@@ -86,6 +88,27 @@ function App() {
     setIncomeRecords((current) => [record, ...current]);
   }
 
+  async function updateIncome(id, payload, invoiceFile) {
+    const upload = await uploadInvoice(invoiceFile);
+    const record = await updateRecord("/api/income", id, {
+      ...payload,
+      ...(upload
+        ? {
+            invoice: upload.fileName,
+            invoiceUrl: upload.url,
+          }
+        : {}),
+    });
+    setIncomeRecords((current) =>
+      current.map((item) => (item.id === record.id ? record : item)),
+    );
+  }
+
+  async function removeIncome(id) {
+    await deleteRecord("/api/income", id);
+    setIncomeRecords((current) => current.filter((record) => record.id !== id));
+  }
+
   async function saveExpense(payload, invoiceFile) {
     const upload = await uploadInvoice(invoiceFile);
     const record = await createRecord("/api/expenses", {
@@ -96,6 +119,27 @@ function App() {
     setExpenseRecords((current) => [record, ...current]);
   }
 
+  async function updateExpense(id, payload, invoiceFile) {
+    const upload = await uploadInvoice(invoiceFile);
+    const record = await updateRecord("/api/expenses", id, {
+      ...payload,
+      ...(upload
+        ? {
+            invoice: upload.fileName,
+            invoiceUrl: upload.url,
+          }
+        : {}),
+    });
+    setExpenseRecords((current) =>
+      current.map((item) => (item.id === record.id ? record : item)),
+    );
+  }
+
+  async function removeExpense(id) {
+    await deleteRecord("/api/expenses", id);
+    setExpenseRecords((current) => current.filter((record) => record.id !== id));
+  }
+
   async function saveInventoryItem(payload, invoiceFile) {
     const upload = await uploadInvoice(invoiceFile);
     const record = await createRecord("/api/inventory", {
@@ -104,6 +148,27 @@ function App() {
       invoiceUrl: upload?.url || "",
     });
     setInventoryItems((current) => [record, ...current]);
+  }
+
+  async function updateInventoryItem(id, payload, invoiceFile) {
+    const upload = await uploadInvoice(invoiceFile);
+    const record = await updateRecord("/api/inventory", id, {
+      ...payload,
+      ...(upload
+        ? {
+            invoice: upload.fileName,
+            invoiceUrl: upload.url,
+          }
+        : {}),
+    });
+    setInventoryItems((current) =>
+      current.map((item) => (item.id === record.id ? record : item)),
+    );
+  }
+
+  async function removeInventoryItem(id) {
+    await deleteRecord("/api/inventory", id);
+    setInventoryItems((current) => current.filter((item) => item.id !== id));
   }
 
   if (loading) {
@@ -240,6 +305,8 @@ function App() {
               isAdmin={isAdmin}
               records={incomeRecords}
               onCreate={saveIncome}
+              onUpdate={updateIncome}
+              onDelete={removeIncome}
             />
           }
         />
@@ -250,6 +317,8 @@ function App() {
               isAdmin={isAdmin}
               records={expenseRecords}
               onCreate={saveExpense}
+              onUpdate={updateExpense}
+              onDelete={removeExpense}
             />
           }
         />
@@ -260,6 +329,8 @@ function App() {
               isAdmin={isAdmin}
               items={inventoryItems}
               onCreate={saveInventoryItem}
+              onUpdate={updateInventoryItem}
+              onDelete={removeInventoryItem}
             />
           }
         />
