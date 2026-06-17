@@ -1,0 +1,108 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "username": "admin",
+      "password": "admin123",
+      "name": "ECE Admin",
+      "role": "admin"
+    },
+    {
+      "id": 2,
+      "username": "viewer",
+      "password": "viewer123",
+      "name": "ECE Viewer",
+      "role": "viewer"
+    }
+  ],
+  "income": [
+    {
+      "id": 1,
+      "source": "Institute Grant",
+      "reference": "ECE/INST/2025-26/001",
+      "date": "2026-04-05",
+      "amount": 1250000,
+      "invoice": "grant-sanction-apr.pdf",
+      "notes": "Annual institute allocation for departmental operations."
+    },
+    {
+      "id": 2,
+      "source": "Consultancy Overhead",
+      "reference": "ECE/CONS/2025-26/018",
+      "date": "2026-05-12",
+      "amount": 320000,
+      "invoice": "consultancy-overhead-may.pdf",
+      "notes": "Department share from sponsored consultancy project."
+    },
+    {
+      "id": 3,
+      "source": "Lab Usage Recovery",
+      "reference": "ECE/LAB/2025-26/009",
+      "date": "2026-06-01",
+      "amount": 85000,
+      "invoice": "lab-usage-june.pdf",
+      "notes": "Recovery collected for lab equipment usage."
+    }
+  ],
+  "expenses": [
+    {
+      "id": 1,
+      "head": "Lab Equipment",
+      "vendor": "Tektronix India",
+      "date": "2026-04-18",
+      "amount": 420000,
+      "invoice": "tek-scope-invoice.pdf",
+      "status": "Approved"
+    },
+    {
+      "id": 2,
+      "head": "Consumables",
+      "vendor": "ElectroSpare Supplies",
+      "date": "2026-05-07",
+      "amount": 76000,
+      "invoice": "consumables-may.pdf",
+      "status": "Pending"
+    },
+    {
+      "id": 3,
+      "head": "Maintenance",
+      "vendor": "Campus Facilities",
+      "date": "2026-05-25",
+      "amount": 54000,
+      "invoice": "lab-maintenance.pdf",
+      "status": "Approved"
+    }
+  ],
+  "inventory": [
+    {
+      "id": 1,
+      "item": "Digital Storage Oscilloscope",
+      "category": "Lab Equipment",
+      "quantity": 6,
+      "location": "ECE Lab 204",
+      "purchaseDate": "2026-04-18",
+      "amount": 420000,
+      "invoice": "tek-scope-invoice.pdf"
+    },
+    {
+      "id": 2,
+      "item": "Soldering Station",
+      "category": "Tools",
+      "quantity": 12,
+      "location": "ECE Workshop",
+      "purchaseDate": "2026-05-07",
+      "amount": 48000,
+      "invoice": "soldering-stations.pdf"
+    },
+    {
+      "id": 3,
+      "item": "FPGA Trainer Kit",
+      "category": "Teaching Aid",
+      "quantity": 10,
+      "location": "Digital Systems Lab",
+      "purchaseDate": "2026-06-04",
+      "amount": 310000,
+      "invoice": "fpga-kits.pdf"
+    }
+  ]
+}
