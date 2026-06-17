@@ -9,20 +9,26 @@ Initial prototype of the ECE Budget Portal developed to facilitate budget tracki
   - Navigation for the three ECE budget modules.
 
 - Institute's Accumulated Income
-  - Track institute grants, recoveries, overheads, and income references.
+  - Track ECE accumulated budget heads in the shared Excel-template format.
+  - Maintain sanctioned amount, description, utilised amount, remaining amount, and purchases-for details.
   - Admin users can upload supporting invoice/document files.
 
 - Expenditure Budget
-  - Add and track departmental expenses.
-  - Maintain vendor, status, amount, date, and invoice details.
+  - Track 2026-27 expenditure particulars in the shared Excel-template format.
+  - Maintain budget, utilized amount, remaining amount/balance, date, status, and invoice details.
+  - Admin users can approve/reject pending expenditure rows.
 
 - Inventory Management
   - Maintain a list of purchased items and resources.
   - Monitor quantity, location, purchase amount, and invoice proof.
 
 - Role-Based Access
-  - Admin users can create records and upload invoices.
-  - Viewer users can review records without update controls.
+  - Admin users can create, edit, delete, approve/reject, and upload invoices.
+  - Viewer users can review, filter, and export records without update controls.
+
+- Reporting Tools
+  - Search, financial-year filtering, date/category/status filters where applicable.
+  - CSV export for accumulated budget, expenditure, and inventory registers.
 
 ## Tech Stack
 
@@ -105,12 +111,18 @@ GET  /api/me
 
 GET  /api/income
 POST /api/income
+PUT  /api/income/:id
+DELETE /api/income/:id
 
 GET  /api/expenses
 POST /api/expenses
+PUT  /api/expenses/:id
+DELETE /api/expenses/:id
 
 GET  /api/inventory
 POST /api/inventory
+PUT  /api/inventory/:id
+DELETE /api/inventory/:id
 
 POST /api/uploads
 GET  /uploads/:fileName
