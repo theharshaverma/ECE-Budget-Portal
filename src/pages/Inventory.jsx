@@ -35,6 +35,7 @@ function formatDate(dateValue) {
 function Inventory({ isAdmin, items, onCreate, onUpdate, onDelete }) {
   const [form, setForm] = useState(initialForm);
   const [editingId, setEditingId] = useState(null);
+  const [matchedInventoryId, setMatchedInventoryId] = useState(null);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [financialYearFilter, setFinancialYearFilter] = useState(() =>
@@ -105,7 +106,7 @@ function Inventory({ isAdmin, items, onCreate, onUpdate, onDelete }) {
           getFinancialYear(item.purchaseDate) === nextFinancialYear,
       );
 
-      setEditingId(existingRecord?.id || null);
+      setMatchedInventoryId(existingRecord?.id || null);
       setForm((current) => ({
         ...current,
         [name]: value,
@@ -115,7 +116,7 @@ function Inventory({ isAdmin, items, onCreate, onUpdate, onDelete }) {
         quantityGiven: existingRecord
           ? String(existingRecord.quantityGiven || 0)
           : "",
-        amount: existingRecord ? String(existingRecord.amount || "") : "",
+        amount: "",
         invoiceFile: null,
       }));
       return;
@@ -170,13 +171,16 @@ function Inventory({ isAdmin, items, onCreate, onUpdate, onDelete }) {
         amount: Number(form.amount),
       };
 
-      if (editingId) {
-        await onUpdate(editingId, payload, form.invoiceFile);
+      const recordId = editingId || matchedInventoryId;
+
+      if (recordId) {
+        await onUpdate(recordId, payload, form.invoiceFile);
       } else {
         await onCreate(payload, form.invoiceFile);
       }
 
       setEditingId(null);
+      setMatchedInventoryId(null);
       setForm(initialForm);
       formElement.reset();
       setSuccess("Saved Successfully");
@@ -189,6 +193,7 @@ function Inventory({ isAdmin, items, onCreate, onUpdate, onDelete }) {
 
   function editItem(item) {
     setEditingId(item.id);
+    setMatchedInventoryId(null);
     setError("");
     setSuccess("");
     setForm({
@@ -204,6 +209,7 @@ function Inventory({ isAdmin, items, onCreate, onUpdate, onDelete }) {
 
   function cancelEdit() {
     setEditingId(null);
+    setMatchedInventoryId(null);
     setForm(initialForm);
     setError("");
     setSuccess("");
