@@ -3,10 +3,10 @@ import InvoiceLink from "../components/InvoiceLink";
 import { currency, exportCsv, getFinancialYear, matchesSearch } from "../utils";
 
 const initialForm = {
-  item: "",
   category: "",
-  quantity: "",
-  location: "",
+  customCategory: "",
+  totalQuantity: "",
+  quantityGiven: "",
   purchaseDate: "",
   amount: "",
   invoiceFile: null,
@@ -37,10 +37,12 @@ function Inventory({ isAdmin, items, onCreate, onUpdate, onDelete }) {
   const [editingId, setEditingId] = useState(null);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const [financialYearFilter, setFinancialYearFilter] = useState("all");
-  const [dateFilter, setDateFilter] = useState("all");
+  const [financialYearFilter, setFinancialYearFilter] = useState(() =>
+    getFinancialYear(new Date()),
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const filteredItems = useMemo(
     () =>
@@ -50,23 +52,14 @@ function Inventory({ isAdmin, items, onCreate, onUpdate, onDelete }) {
         const matchesFinancialYear =
           financialYearFilter === "all" ||
           getFinancialYear(item.purchaseDate) === financialYearFilter;
-        const matchesDate =
-          dateFilter === "all" || formatDate(item.purchaseDate) === dateFilter;
 
         return (
           matchesCategory &&
           matchesFinancialYear &&
-          matchesDate &&
           matchesSearch(item, search)
         );
       }),
-    [
-      categoryFilter,
-      dateFilter,
-      financialYearFilter,
-      items,
-      search,
-    ],
+    [categoryFilter, financialYearFilter, items, search],
   );
 
   const financialYearOptions = useMemo(
@@ -77,29 +70,57 @@ function Inventory({ isAdmin, items, onCreate, onUpdate, onDelete }) {
     ],
     [items],
   );
-
-  const dateOptions = useMemo(
-    () => [...new Set(items.map((item) => formatDate(item.purchaseDate)).filter(Boolean))],
+  const categoryOptions = useMemo(
+    () => [
+      ...new Set([
+        ...categories,
+        ...items.map((item) => item.category).filter(Boolean),
+      ]),
+    ],
     [items],
   );
 
-  const totalItems = filteredItems.reduce((sum, item) => sum + item.quantity, 0);
   const inventoryValue = filteredItems.reduce((sum, item) => sum + item.amount, 0);
-  const categorySummary = useMemo(
-    () =>
-      categories
-        .map((category) => ({
-          category,
-          quantity: filteredItems
-            .filter((item) => item.category === category)
-            .reduce((sum, item) => sum + item.quantity, 0),
-        }))
-        .filter((item) => item.quantity > 0),
-    [filteredItems],
+  const selectedFinancialYear = getFinancialYear(form.purchaseDate);
+  const existingInventoryRecord = items.find(
+    (item) =>
+      item.category === form.category &&
+      getFinancialYear(item.purchaseDate) === selectedFinancialYear,
+  );
+  const remainingQuantity = Math.max(
+    Number(form.totalQuantity || 0) - Number(form.quantityGiven || 0),
+    0,
   );
 
   function updateField(event) {
     const { name, value, files } = event.target;
+
+    if (name === "category" || name === "purchaseDate") {
+      const nextCategory = name === "category" ? value : form.category;
+      const nextDate = name === "purchaseDate" ? value : form.purchaseDate;
+      const nextFinancialYear = getFinancialYear(nextDate);
+      const existingRecord = items.find(
+        (item) =>
+          item.category === nextCategory &&
+          getFinancialYear(item.purchaseDate) === nextFinancialYear,
+      );
+
+      setEditingId(existingRecord?.id || null);
+      setForm((current) => ({
+        ...current,
+        [name]: value,
+        totalQuantity: existingRecord
+          ? String(existingRecord.quantity || 0)
+          : "",
+        quantityGiven: existingRecord
+          ? String(existingRecord.quantityGiven || 0)
+          : "",
+        amount: existingRecord ? String(existingRecord.amount || "") : "",
+        invoiceFile: null,
+      }));
+      return;
+    }
+
     setForm((current) => ({
       ...current,
       [name]: files ? files[0] || null : value,
@@ -107,32 +128,44 @@ function Inventory({ isAdmin, items, onCreate, onUpdate, onDelete }) {
   }
 
   function validateForm() {
-    if (Number(form.quantity) <= 0) {
-      throw new Error("Quantity must be greater than zero");
+    if (Number(form.totalQuantity) <= 0) {
+      throw new Error("Total quantity must be greater than zero");
+    }
+
+    if (Number(form.quantityGiven) < 0) {
+      throw new Error("Quantity given must be zero or greater");
+    }
+
+    if (Number(form.quantityGiven) > Number(form.totalQuantity)) {
+      throw new Error("Quantity given cannot exceed total quantity");
     }
 
     if (Number(form.amount) <= 0) {
       throw new Error("Purchase amount must be greater than zero");
     }
 
-    if (!editingId && !form.invoiceFile) {
-      throw new Error("Purchase invoice is required");
-    }
   }
 
   async function saveInventoryItem(event) {
     event.preventDefault();
+    const formElement = event.currentTarget;
 
     try {
       setSaving(true);
       setError("");
+      setSuccess("");
       validateForm();
 
       const payload = {
-        item: form.item.trim(),
-        category: form.category,
-        quantity: Number(form.quantity),
-        location: form.location.trim(),
+        item: "Inventory Purchase",
+        category:
+          form.category === "Other"
+            ? form.customCategory.trim()
+            : form.category,
+        quantity: Number(form.totalQuantity),
+        quantityGiven: Number(form.quantityGiven || 0),
+        remainingQuantity,
+        location: "Not specified",
         purchaseDate: form.purchaseDate,
         amount: Number(form.amount),
       };
@@ -145,7 +178,8 @@ function Inventory({ isAdmin, items, onCreate, onUpdate, onDelete }) {
 
       setEditingId(null);
       setForm(initialForm);
-      event.currentTarget.reset();
+      formElement.reset();
+      setSuccess("Saved Successfully");
     } catch (saveError) {
       setError(saveError.message);
     } finally {
@@ -156,11 +190,12 @@ function Inventory({ isAdmin, items, onCreate, onUpdate, onDelete }) {
   function editItem(item) {
     setEditingId(item.id);
     setError("");
+    setSuccess("");
     setForm({
-      item: item.item,
       category: item.category,
-      quantity: String(item.quantity),
-      location: item.location,
+      customCategory: "",
+      totalQuantity: String(item.quantity || 0),
+      quantityGiven: String(item.quantityGiven || 0),
       purchaseDate: item.purchaseDate,
       amount: String(item.amount),
       invoiceFile: null,
@@ -171,23 +206,30 @@ function Inventory({ isAdmin, items, onCreate, onUpdate, onDelete }) {
     setEditingId(null);
     setForm(initialForm);
     setError("");
+    setSuccess("");
   }
 
   async function deleteItem(item) {
-    if (!window.confirm(`Delete inventory item "${item.item}"?`)) return;
+    if (!window.confirm("Delete this inventory record?")) return;
     await onDelete(item.id);
   }
 
   function exportRows() {
     exportCsv("ece-inventory-register.csv", filteredItems, [
-      { label: "Item", value: "item" },
-      { label: "Category", value: "category" },
-      { label: "Quantity", value: "quantity" },
-      { label: "Location", value: "location" },
       { label: "Purchase Date", value: (item) => formatDate(item.purchaseDate) },
+      { label: "Category", value: "category" },
+      { label: "Total Quantity", value: "quantity" },
       {
-        label: "Financial Year",
-        value: (item) => getFinancialYear(item.purchaseDate),
+        label: "Quantity Given",
+        value: (item) => Number(item.quantityGiven || 0),
+      },
+      {
+        label: "Remaining Quantity",
+        value: (item) =>
+          Math.max(
+            Number(item.quantity || 0) - Number(item.quantityGiven || 0),
+            0,
+          ),
       },
       { label: "Amount", value: "amount" },
       { label: "Invoice", value: "invoice" },
@@ -206,43 +248,41 @@ function Inventory({ isAdmin, items, onCreate, onUpdate, onDelete }) {
           </p>
         </div>
         <div className="status-panel">
-          <span className="status-label">Filtered Inventory Value</span>
+          <span className="status-label">
+            Total Amount Spent ·{" "}
+            {financialYearFilter === "all"
+              ? "All Financial Years"
+              : `FY ${financialYearFilter}`}
+          </span>
           <strong>{currency.format(inventoryValue)}</strong>
-          <p>{totalItems} units currently shown.</p>
         </div>
       </section>
-
-      {categorySummary.length > 0 && (
-        <section className="summary-strip" aria-label="Inventory quantity by category">
-          {categorySummary.map((item) => (
-            <div key={item.category}>
-              <span>{item.category}</span>
-              <strong>{item.quantity}</strong>
-            </div>
-          ))}
-        </section>
-      )}
 
       {isAdmin && (
         <section className="panel">
           <div className="section-heading">
             <h2>{editingId ? "Edit Inventory Item" : "Add Inventory Item"}</h2>
             <p>
-              Upload the purchase invoice for new items. Existing items keep
-              their invoice unless a replacement is selected.
+              Invoice upload is optional. Existing items keep their invoice
+              unless a replacement is selected.
             </p>
           </div>
 
           <form className="form-grid" onSubmit={saveInventoryItem}>
             <label>
-              Item Name
+              Purchase Date
               <input
                 required
-                name="item"
-                value={form.item}
+                type="date"
+                name="purchaseDate"
+                value={form.purchaseDate}
                 onChange={updateField}
-                placeholder="Function Generator"
               />
+              {form.purchaseDate && (
+                <span className="field-hint">
+                  Financial year: {getFinancialYear(form.purchaseDate)}
+                </span>
+              )}
             </label>
             <label>
               Category
@@ -253,42 +293,56 @@ function Inventory({ isAdmin, items, onCreate, onUpdate, onDelete }) {
                 onChange={updateField}
               >
                 <option value="">Select category</option>
-                {categories.map((category) => (
+                {categoryOptions.map((category) => (
                   <option key={category}>{category}</option>
                 ))}
+                <option>Other</option>
               </select>
             </label>
+            {form.category === "Other" && (
+              <label>
+                Enter Category
+                <input
+                  required
+                  name="customCategory"
+                  value={form.customCategory}
+                  onChange={updateField}
+                  placeholder="Enter custom category"
+                />
+              </label>
+            )}
             <label>
-              Quantity
+              Total Quantity
               <input
                 required
+                readOnly={Boolean(existingInventoryRecord)}
                 min="1"
                 type="number"
-                name="quantity"
-                value={form.quantity}
+                name="totalQuantity"
+                value={form.totalQuantity}
                 onChange={updateField}
-                placeholder="4"
+                placeholder={
+                  existingInventoryRecord
+                    ? "Loaded automatically"
+                    : "Enter total quantity"
+                }
               />
             </label>
             <label>
-              Location
+              Quantity Given
               <input
                 required
-                name="location"
-                value={form.location}
+                min="0"
+                type="number"
+                name="quantityGiven"
+                value={form.quantityGiven}
                 onChange={updateField}
-                placeholder="ECE Lab 204"
+                placeholder="0"
               />
             </label>
             <label>
-              Purchase Date
-              <input
-                required
-                type="date"
-                name="purchaseDate"
-                value={form.purchaseDate}
-                onChange={updateField}
-              />
+              Remaining Quantity
+              <input readOnly value={remainingQuantity} />
             </label>
             <label>
               Purchase Amount
@@ -305,7 +359,6 @@ function Inventory({ isAdmin, items, onCreate, onUpdate, onDelete }) {
             <label>
               Upload Invoice
               <input
-                required={!editingId}
                 type="file"
                 name="invoiceFile"
                 accept=".pdf,.png,.jpg,.jpeg"
@@ -326,6 +379,7 @@ function Inventory({ isAdmin, items, onCreate, onUpdate, onDelete }) {
                 </button>
               )}
             </div>
+            {success && <p className="form-success span-two">{success}</p>}
             {error && <p className="form-error span-two">{error}</p>}
           </form>
         </section>
@@ -352,7 +406,7 @@ function Inventory({ isAdmin, items, onCreate, onUpdate, onDelete }) {
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search item, location, invoice..."
+              placeholder="Search category, invoice..."
             />
           </label>
           <label>
@@ -374,17 +428,8 @@ function Inventory({ isAdmin, items, onCreate, onUpdate, onDelete }) {
               onChange={(event) => setCategoryFilter(event.target.value)}
             >
               <option value="all">All categories</option>
-              {categories.map((category) => (
+              {categoryOptions.map((category) => (
                 <option key={category}>{category}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Date
-            <select value={dateFilter} onChange={(event) => setDateFilter(event.target.value)}>
-              <option value="all">All dates</option>
-              {dateOptions.map((date) => (
-                <option key={date}>{date}</option>
               ))}
             </select>
           </label>
@@ -394,12 +439,11 @@ function Inventory({ isAdmin, items, onCreate, onUpdate, onDelete }) {
           <table>
             <thead>
               <tr>
-                <th>Item</th>
-                <th>Category</th>
-                <th>Qty</th>
-                <th>Location</th>
                 <th>Purchase Date</th>
-                <th>FY</th>
+                <th>Category</th>
+                <th>Total Quantity</th>
+                <th>Quantity Given</th>
+                <th>Remaining</th>
                 <th>Amount</th>
                 <th>Invoice</th>
                 {isAdmin && <th>Actions</th>}
@@ -408,12 +452,17 @@ function Inventory({ isAdmin, items, onCreate, onUpdate, onDelete }) {
             <tbody>
               {filteredItems.map((item) => (
                 <tr key={item.id}>
-                  <td>{item.item}</td>
+                  <td>{formatDate(item.purchaseDate)}</td>
                   <td>{item.category}</td>
                   <td>{item.quantity}</td>
-                  <td>{item.location}</td>
-                  <td>{formatDate(item.purchaseDate)}</td>
-                  <td>{getFinancialYear(item.purchaseDate)}</td>
+                  <td>{Number(item.quantityGiven || 0)}</td>
+                  <td>
+                    {Math.max(
+                      Number(item.quantity || 0) -
+                        Number(item.quantityGiven || 0),
+                      0,
+                    )}
+                  </td>
                   <td>{currency.format(item.amount)}</td>
                   <td>
                     <InvoiceLink record={item} />
@@ -434,7 +483,7 @@ function Inventory({ isAdmin, items, onCreate, onUpdate, onDelete }) {
               ))}
               {filteredItems.length === 0 && (
                 <tr>
-                  <td colSpan={isAdmin ? 9 : 8}>No inventory records found.</td>
+                  <td colSpan={isAdmin ? 8 : 7}>No inventory records found.</td>
                 </tr>
               )}
             </tbody>

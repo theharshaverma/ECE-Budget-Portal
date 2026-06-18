@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { getFinancialYear } from "../utils";
 
 const currency = new Intl.NumberFormat("en-IN", {
   style: "currency",
@@ -7,8 +8,50 @@ const currency = new Intl.NumberFormat("en-IN", {
 });
 
 function Dashboard({ isAdmin, incomeRecords, expenseRecords, inventoryItems }) {
-  const totalIncome = incomeRecords.reduce((sum, record) => sum + record.amount, 0);
-  const totalExpense = expenseRecords.reduce((sum, record) => sum + record.amount, 0);
+  const currentFinancialYear = getFinancialYear(new Date());
+  const accumulatedIncomeHeads = new Map();
+  incomeRecords.forEach((record) => {
+    const financialYear =
+      getFinancialYear(record.date) || record.financialYear || "2026-2027";
+
+    if (financialYear !== currentFinancialYear) return;
+
+    const key = `${financialYear}::${record.budgetHead}`;
+    const current = accumulatedIncomeHeads.get(key) || {
+      approved: 0,
+      utilized: 0,
+    };
+    current.approved = Math.max(current.approved, Number(record.amount || 0));
+    current.utilized += Number(record.utilisedAmountLakh || 0) * 100000;
+    accumulatedIncomeHeads.set(key, current);
+  });
+  const remainingIncome = [...accumulatedIncomeHeads.values()].reduce(
+    (sum, head) => sum + Math.max(head.approved - head.utilized, 0),
+    0,
+  );
+
+  const expenditureHeads = new Map();
+  expenseRecords.forEach((record) => {
+    const financialYear = getFinancialYear(record.date) || "2026-2027";
+
+    if (financialYear !== currentFinancialYear) return;
+
+    const key = `${financialYear}::${record.head}`;
+    const current = expenditureHeads.get(key) || {
+      approved: 0,
+      utilized: 0,
+    };
+    current.approved = Math.max(
+      current.approved,
+      Number(record.budgetLakh || 0) * 100000,
+    );
+    current.utilized += Number(record.amount || 0);
+    expenditureHeads.set(key, current);
+  });
+  const remainingExpense = [...expenditureHeads.values()].reduce(
+    (sum, head) => sum + Math.max(head.approved - head.utilized, 0),
+    0,
+  );
   const inventoryValue = inventoryItems.reduce((sum, item) => sum + item.amount, 0);
 
   const modules = [
@@ -16,22 +59,22 @@ function Dashboard({ isAdmin, incomeRecords, expenseRecords, inventoryItems }) {
       title: "Institute's Accumulated Income",
       description:
         "Track official ECE accumulated budget heads, sanctioned amount and utilization.",
-      metric: currency.format(totalIncome),
-      label: `${incomeRecords.length} budget heads`,
+      metric: currency.format(remainingIncome),
+      label: `FY ${currentFinancialYear} remaining · ${accumulatedIncomeHeads.size} budget heads`,
       link: "/accumulated-income",
     },
     {
       title: "Expenditure Budget",
       description:
         "Manage 2026-27 expenditure particulars, utilization, balance and invoices.",
-      metric: currency.format(totalExpense),
-      label: `${expenseRecords.length} expenditure heads`,
+      metric: currency.format(remainingExpense),
+      label: `FY ${currentFinancialYear} remaining · ${expenditureHeads.size} expenditure heads`,
       link: "/expenditure-budget",
     },
     {
       title: "Inventory",
       description:
-        "Track purchased items, quantity, location and invoice references.",
+        "Track purchased items, quantity and invoice references.",
       metric: currency.format(inventoryValue),
       label: `${inventoryItems.length} inventory items`,
       link: "/inventory",

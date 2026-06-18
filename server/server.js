@@ -182,10 +182,12 @@ function validateRecord(collection, body) {
   }
 
   if (collection === "inventory") {
-    requireText(body.item, "Item name");
     requireText(body.category, "Category");
     requirePositiveNumber(body.quantity, "Quantity");
-    requireText(body.location, "Location");
+    requireNonNegativeNumber(body.quantityGiven || 0, "Quantity given");
+    if (Number(body.quantityGiven || 0) > Number(body.quantity)) {
+      throw new Error("Quantity given cannot exceed total quantity");
+    }
     requireDate(body.purchaseDate, "Purchase date");
     requirePositiveNumber(body.amount, "Purchase amount");
   }

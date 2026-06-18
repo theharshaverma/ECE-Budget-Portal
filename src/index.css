@@ -492,6 +492,49 @@ a {
   resize: vertical;
 }
 
+.budget-head-combobox {
+  position: relative;
+}
+
+.budget-head-suggestions {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid #bfded9;
+  border-radius: 7px;
+  background: #ffffff;
+  box-shadow: 0 14px 32px rgba(15, 61, 55, 0.16);
+}
+
+.budget-head-suggestions button {
+  width: 100%;
+  display: block;
+  border: 0;
+  border-bottom: 1px solid #e4f1ef;
+  padding: 11px 13px;
+  color: #1f2d2b;
+  background: #ffffff;
+  cursor: pointer;
+  text-align: left;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.budget-head-suggestions button:last-child {
+  border-bottom: 0;
+}
+
+.budget-head-suggestions button:hover,
+.budget-head-suggestions button:focus {
+  color: #0f3d37;
+  background: #eaf6f4;
+  outline: none;
+}
+
 .form-grid input:focus,
 .form-grid select:focus,
 .form-grid textarea:focus,
@@ -505,6 +548,18 @@ a {
 .form-error {
   color: #8a1f18;
   font-size: 14px;
+  font-weight: 700;
+}
+
+.form-success {
+  color: #0d5d36;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.field-hint {
+  color: #5a6b68;
+  font-size: 12px;
   font-weight: 700;
 }
 
@@ -608,6 +663,67 @@ tbody tr:last-child td {
   cursor: pointer;
   font-size: 13px;
   font-weight: 800;
+}
+
+.budget-head-row {
+  cursor: pointer;
+}
+
+.budget-head-row:hover td {
+  background: #f4faf9;
+}
+
+.budget-head-toggle {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  border: 0;
+  padding: 0;
+  color: #0f3d37;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.expand-icon {
+  width: 12px;
+  height: 20px;
+  flex: 0 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #2e9b94;
+  background: transparent;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.budget-entry-detail > td {
+  padding: 14px;
+  background: #f4faf9;
+}
+
+.nested-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #d7ece8;
+  border-radius: 7px;
+  background: #ffffff;
+}
+
+.nested-table-wrap table {
+  min-width: 820px;
+}
+
+.nested-table-wrap th {
+  background: #f0f8f7;
+  font-size: 13px;
+}
+
+.nested-table-wrap td {
+  font-size: 13px;
 }
 
 .entry-list {

@@ -205,7 +205,7 @@
       "vendor": "ECE Department",
       "date": "2026-04-01",
       "amount": 0,
-      "invoice": "Not attached",
+      "invoice": "Not Attached",
       "invoiceUrl": "",
       "status": "Pending"
     },
@@ -254,34 +254,34 @@
   ],
   "inventory": [
     {
-      "id": 1,
-      "item": "Digital Storage Oscilloscope",
-      "category": "Lab Equipment",
-      "quantity": 6,
-      "location": "ECE Lab 204",
-      "purchaseDate": "2026-04-18",
-      "amount": 420000,
-      "invoice": "tek-scope-invoice.pdf"
-    },
-    {
       "id": 2,
-      "item": "Soldering Station",
-      "category": "Tools",
-      "quantity": 12,
-      "location": "ECE Workshop",
-      "purchaseDate": "2026-05-07",
-      "amount": 48000,
-      "invoice": "soldering-stations.pdf"
+      "item": "Inventory Purchase",
+      "category": "Books",
+      "quantity": 4,
+      "location": "Not specified",
+      "purchaseDate": "2026-06-18",
+      "amount": 234,
+      "invoice": "Not Attached",
+      "invoiceUrl": "",
+      "createdBy": "admin",
+      "createdAt": "2026-06-18T17:29:07.311Z",
+      "quantityGiven": 2,
+      "remainingQuantity": 2,
+      "updatedBy": "admin",
+      "updatedAt": "2026-06-18T17:35:33.857Z"
     },
     {
-      "id": 3,
-      "item": "FPGA Trainer Kit",
-      "category": "Teaching Aid",
-      "quantity": 10,
-      "location": "Digital Systems Lab",
-      "purchaseDate": "2026-06-04",
-      "amount": 310000,
-      "invoice": "fpga-kits.pdf"
+      "id": 1,
+      "item": "Books",
+      "category": "Tools",
+      "quantity": 3,
+      "location": "Not specified",
+      "purchaseDate": "2026-03-18",
+      "amount": 3467,
+      "invoice": "Not Attached",
+      "invoiceUrl": "",
+      "createdBy": "admin",
+      "createdAt": "2026-06-18T17:23:43.126Z"
     }
   ]
 }

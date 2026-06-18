@@ -82,7 +82,7 @@ function App() {
     const upload = await uploadInvoice(invoiceFile);
     const record = await createRecord("/api/income", {
       ...payload,
-      invoice: upload?.fileName || "Invoice not attached",
+      invoice: upload?.fileName || "Not Attached",
       invoiceUrl: upload?.url || "",
     });
     setIncomeRecords((current) => [record, ...current]);
@@ -113,7 +113,7 @@ function App() {
     const upload = await uploadInvoice(invoiceFile);
     const record = await createRecord("/api/expenses", {
       ...payload,
-      invoice: upload?.fileName || "Invoice not attached",
+      invoice: upload?.fileName || "Not Attached",
       invoiceUrl: upload?.url || "",
     });
     setExpenseRecords((current) => [record, ...current]);
@@ -144,7 +144,7 @@ function App() {
     const upload = await uploadInvoice(invoiceFile);
     const record = await createRecord("/api/inventory", {
       ...payload,
-      invoice: upload?.fileName || "Invoice not attached",
+      invoice: upload?.fileName || "Not Attached",
       invoiceUrl: upload?.url || "",
     });
     setInventoryItems((current) => [record, ...current]);

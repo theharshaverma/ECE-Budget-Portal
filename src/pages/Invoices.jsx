@@ -1,129 +1,242 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useRef, useState } from "react";
 import InvoiceLink from "../components/InvoiceLink";
-import { currency, exportCsv, matchesSearch } from "../utils";
+import {
+  currency,
+  exportCsv,
+  getFinancialYear,
+  matchesSearch,
+} from "../utils";
 
 const initialForm = {
-  financialYear: "2025-2026",
+  date: "",
   budgetHead: "",
-  amountText: "",
-  amount: "",
+  approvedAmount: "",
+  utilizedAmount: "",
   description: "",
-  utilisedAmountLakh: "",
   purchasesFor: "",
   invoiceFile: null,
 };
+
+const inrNumber = new Intl.NumberFormat("en-IN", {
+  maximumFractionDigits: 2,
+});
+
+function getRecordFinancialYear(record) {
+  return getFinancialYear(record.date) || record.financialYear || "2026-2027";
+}
+
+function getUtilizedAmount(record) {
+  return Number(record.utilisedAmountLakh || 0) * 100000;
+}
+
+function getFormFinancialYear(date) {
+  return getFinancialYear(date);
+}
 
 function Invoices({ isAdmin, records, onCreate, onUpdate, onDelete }) {
   const [form, setForm] = useState(initialForm);
   const [editingId, setEditingId] = useState(null);
   const [search, setSearch] = useState("");
-  const [financialYearFilter, setFinancialYearFilter] = useState("all");
-  const [invoiceFilter, setInvoiceFilter] = useState("all");
-  const [utilisationFilter, setUtilisationFilter] = useState("all");
-  const [minAmount, setMinAmount] = useState("");
-  const [maxAmount, setMaxAmount] = useState("");
+  const [headFilter, setHeadFilter] = useState("all");
+  const [financialYearFilter, setFinancialYearFilter] = useState(() =>
+    getFinancialYear(new Date()),
+  );
+  const [expandedHeads, setExpandedHeads] = useState(() => new Set());
+  const [showHeadSuggestions, setShowHeadSuggestions] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const formSectionRef = useRef(null);
+
+  const budgetHeadOptions = useMemo(
+    () => [...new Set(records.map((record) => record.budgetHead).filter(Boolean))],
+    [records],
+  );
+  const matchingBudgetHeads = budgetHeadOptions.filter((head) =>
+    head.toLowerCase().includes(form.budgetHead.trim().toLowerCase()),
+  );
+  const financialYearOptions = useMemo(
+    () => [...new Set(records.map(getRecordFinancialYear))],
+    [records],
+  );
 
   const filteredRecords = useMemo(
     () =>
       records.filter((record) => {
-        const financialYear = record.financialYear || "2025-2026";
         const matchesFinancialYear =
-          financialYearFilter === "all" || financialYear === financialYearFilter;
-        const hasInvoice = Boolean(record.invoiceUrl);
-        const matchesInvoice =
-          invoiceFilter === "all" ||
-          (invoiceFilter === "attached" && hasInvoice) ||
-          (invoiceFilter === "missing" && !hasInvoice);
-        const utilisedAmount = Number(record.utilisedAmountLakh || 0);
-        const remainingAmount = getRemainingAmount(record);
-        const matchesUtilisation =
-          utilisationFilter === "all" ||
-          (utilisationFilter === "utilised" && utilisedAmount > 0) ||
-          (utilisationFilter === "not-utilised" && utilisedAmount === 0) ||
-          (utilisationFilter === "remaining" && remainingAmount > 0);
-        const matchesMinAmount = !minAmount || Number(record.amount || 0) >= Number(minAmount);
-        const matchesMaxAmount = !maxAmount || Number(record.amount || 0) <= Number(maxAmount);
+          financialYearFilter === "all" ||
+          getRecordFinancialYear(record) === financialYearFilter;
+        const matchesHead =
+          headFilter === "all" || record.budgetHead === headFilter;
 
         return (
           matchesFinancialYear &&
-          matchesInvoice &&
-          matchesUtilisation &&
-          matchesMinAmount &&
-          matchesMaxAmount &&
+          matchesHead &&
           matchesSearch(record, search)
         );
       }),
     [
       financialYearFilter,
-      invoiceFilter,
-      maxAmount,
-      minAmount,
+      headFilter,
       records,
       search,
-      utilisationFilter,
     ],
   );
 
-  const financialYearOptions = useMemo(
-    () => [
-      ...new Set(records.map((record) => record.financialYear || "2025-2026")),
-    ],
-    [records],
-  );
+  const groupedBudgetHeads = useMemo(() => {
+    const groups = new Map();
 
-  const totalBudget = filteredRecords.reduce((sum, record) => sum + record.amount, 0);
-  const totalUtilisedLakh = filteredRecords.reduce(
-    (sum, record) => sum + Number(record.utilisedAmountLakh || 0),
+    filteredRecords.forEach((record) => {
+      const financialYear = getRecordFinancialYear(record);
+      const head = record.budgetHead || record.source || "Unassigned Budget Head";
+      const key = `${financialYear}::${head}`;
+      const group = groups.get(key) || {
+        key,
+        financialYear,
+        head,
+        approvedAmount: 0,
+        utilizedAmount: 0,
+        entries: [],
+      };
+
+      group.approvedAmount = Math.max(
+        group.approvedAmount,
+        Number(record.amount || 0),
+      );
+      group.utilizedAmount += getUtilizedAmount(record);
+      group.entries.push(record);
+      groups.set(key, group);
+    });
+
+    return [...groups.values()].map((group) => ({
+      ...group,
+      remainingAmount: Math.max(
+        group.approvedAmount - group.utilizedAmount,
+        0,
+      ),
+    }));
+  }, [filteredRecords]);
+
+  const totalBudget = groupedBudgetHeads.reduce(
+    (sum, group) => sum + group.approvedAmount,
     0,
   );
-  const totalRemaining = filteredRecords.reduce(
-    (sum, record) =>
-      sum + Math.max(Number(record.amount || 0) - Number(record.utilisedAmountLakh || 0) * 100000, 0),
+  const totalUtilized = groupedBudgetHeads.reduce(
+    (sum, group) => sum + group.utilizedAmount,
+    0,
+  );
+  const totalRemaining = groupedBudgetHeads.reduce(
+    (sum, group) => sum + group.remainingAmount,
     0,
   );
 
-  function getRemainingAmount(record) {
-    return Math.max(
-      Number(record.amount || 0) - Number(record.utilisedAmountLakh || 0) * 100000,
-      0,
-    );
+  function findApprovedAmount(head, financialYear) {
+    return records
+      .filter(
+        (record) =>
+          record.budgetHead === head &&
+          getRecordFinancialYear(record) === financialYear,
+      )
+      .reduce(
+        (maximum, record) => Math.max(maximum, Number(record.amount || 0)),
+        0,
+      );
   }
 
   function updateField(event) {
     const { name, value, files } = event.target;
+
+    if (name === "budgetHead" || name === "date") {
+      const nextHead = name === "budgetHead" ? value : form.budgetHead;
+      const nextDate = name === "date" ? value : form.date;
+      const nextYear = getFormFinancialYear(nextDate);
+      const approvedAmount = findApprovedAmount(nextHead, nextYear);
+
+      setForm((current) => ({
+        ...current,
+        [name]: value,
+        approvedAmount: approvedAmount ? String(approvedAmount) : "",
+      }));
+      return;
+    }
+
     setForm((current) => ({
       ...current,
       [name]: files ? files[0] || null : value,
     }));
   }
 
+  function selectBudgetHead(head) {
+    const approvedAmount = findApprovedAmount(
+      head,
+      getFormFinancialYear(form.date),
+    );
+    setForm((current) => ({
+      ...current,
+      budgetHead: head,
+      approvedAmount: approvedAmount ? String(approvedAmount) : "",
+    }));
+    setShowHeadSuggestions(false);
+  }
+
+  const isExistingBudgetHead = records.some(
+    (record) =>
+      record.budgetHead === form.budgetHead &&
+      getRecordFinancialYear(record) === getFormFinancialYear(form.date),
+  );
+
+  const otherUtilizedAmount = records
+    .filter(
+      (record) =>
+        record.budgetHead === form.budgetHead &&
+        getRecordFinancialYear(record) === getFormFinancialYear(form.date) &&
+        (!editingId || Number(record.id) !== Number(editingId)),
+    )
+    .reduce((sum, record) => sum + getUtilizedAmount(record), 0);
+  const calculatedRemainingAmount = Math.max(
+    Number(form.approvedAmount || 0) -
+      otherUtilizedAmount -
+      Number(form.utilizedAmount || 0),
+    0,
+  );
+  const calculatedTotalUtilized =
+    otherUtilizedAmount + Number(form.utilizedAmount || 0);
+
   function validateForm() {
-    if (Number(form.amount) <= 0) {
-      throw new Error("Amount in INR must be greater than zero");
+    if (Number(form.approvedAmount) <= 0) {
+      throw new Error("Total approved amount must be greater than zero");
     }
 
-    if (Number(form.utilisedAmountLakh) < 0) {
-      throw new Error("Utilised amount must be zero or greater");
+    if (Number(form.utilizedAmount) < 0) {
+      throw new Error("Utilized amount must be zero or greater");
+    }
+
+    if (
+      otherUtilizedAmount + Number(form.utilizedAmount || 0) >
+      Number(form.approvedAmount || 0)
+    ) {
+      throw new Error("Utilized amount cannot exceed the remaining budget");
     }
   }
 
   async function saveIncomeRecord(event) {
     event.preventDefault();
+    const formElement = event.currentTarget;
 
     try {
       setSaving(true);
       setError("");
+      setSuccess("");
       validateForm();
 
       const payload = {
-        financialYear: form.financialYear,
+        date: form.date,
+        financialYear: getFinancialYear(form.date),
         budgetHead: form.budgetHead.trim(),
-        amountText: form.amountText.trim(),
-        amount: Number(form.amount),
+        amountText: `INR ${inrNumber.format(Number(form.approvedAmount))}`,
+        amount: Number(form.approvedAmount),
         description: form.description.trim(),
-        utilisedAmountLakh: Number(form.utilisedAmountLakh || 0),
+        utilisedAmountLakh: Number(form.utilizedAmount || 0) / 100000,
         purchasesFor: form.purchasesFor.trim(),
       };
 
@@ -135,7 +248,8 @@ function Invoices({ isAdmin, records, onCreate, onUpdate, onDelete }) {
 
       setEditingId(null);
       setForm(initialForm);
-      event.currentTarget.reset();
+      formElement.reset();
+      setSuccess("Saved Successfully");
     } catch (saveError) {
       setError(saveError.message);
     } finally {
@@ -146,15 +260,21 @@ function Invoices({ isAdmin, records, onCreate, onUpdate, onDelete }) {
   function editRecord(record) {
     setEditingId(record.id);
     setError("");
+    setSuccess("");
     setForm({
-      financialYear: record.financialYear || "2025-2026",
+      date: record.date || "",
       budgetHead: record.budgetHead || record.source || "",
-      amountText: record.amountText || currency.format(record.amount || 0),
-      amount: String(record.amount || ""),
+      approvedAmount: String(record.amount || ""),
+      utilizedAmount: String(getUtilizedAmount(record)),
       description: record.description || record.notes || "",
-      utilisedAmountLakh: String(record.utilisedAmountLakh || 0),
       purchasesFor: record.purchasesFor || "",
       invoiceFile: null,
+    });
+    requestAnimationFrame(() => {
+      formSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
     });
   }
 
@@ -162,28 +282,65 @@ function Invoices({ isAdmin, records, onCreate, onUpdate, onDelete }) {
     setEditingId(null);
     setForm(initialForm);
     setError("");
+    setSuccess("");
   }
 
   async function deleteIncomeRecord(record) {
-    if (!window.confirm(`Delete budget head "${record.budgetHead}"?`)) return;
+    const entriesUnderHead = records.filter(
+      (item) =>
+        item.budgetHead === record.budgetHead &&
+        getRecordFinancialYear(item) === getRecordFinancialYear(record),
+    ).length;
+    const message =
+      entriesUnderHead === 1
+        ? `Warning: this is the only entry under "${record.budgetHead}" for ${getRecordFinancialYear(
+            record,
+          )}. Deleting it will also remove the budget head. Continue?`
+        : "Delete only this accumulated-income entry?";
+
+    if (!window.confirm(message)) return;
     await onDelete(record.id);
   }
 
+  function toggleBudgetHead(key) {
+    setExpandedHeads((current) => {
+      const next = new Set(current);
+
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+
+      return next;
+    });
+  }
+
   function exportRows() {
-    exportCsv("ece-accumulated-budget.csv", filteredRecords, [
-      { label: "S.N.", value: (_record, index) => index + 1 },
-      { label: "Financial Year", value: (record) => record.financialYear || "2025-2026" },
-      { label: "Budget Head", value: "budgetHead" },
-      { label: "Amount", value: "amountText" },
-      { label: "Description", value: "description" },
-      { label: "Utilised Amount (in lakhs)", value: "utilisedAmountLakh" },
-      {
-        label: "Remaining Amount",
-        value: (record) => getRemainingAmount(record),
-      },
-      { label: "Purchases for", value: "purchasesFor" },
-      { label: "Invoice", value: "invoice" },
-    ]);
+    const selectedFinancialYear =
+      financialYearFilter === "all" ? "all-years" : financialYearFilter;
+
+    exportCsv(
+      `ece-accumulated-income-${selectedFinancialYear}.csv`,
+      groupedBudgetHeads,
+      [
+        { label: "S. N.", value: (_group, index) => index + 1 },
+        { label: "Budget Head", value: "head" },
+        {
+          label: "Total Amount Approved (INR)",
+          value: (group) => inrNumber.format(group.approvedAmount),
+        },
+        {
+          label: "Utilized (INR)",
+          value: (group) => inrNumber.format(group.utilizedAmount),
+        },
+        {
+          label: "Remaining (INR)",
+          value: (group) => inrNumber.format(group.remainingAmount),
+        },
+        { label: "Entries", value: (group) => group.entries.length },
+      ],
+    );
   }
 
   return (
@@ -193,97 +350,154 @@ function Invoices({ isAdmin, records, onCreate, onUpdate, onDelete }) {
           <p className="eyebrow">Accumulated Budget</p>
           <h1>Institute&apos;s Accumulated Income - ECE Department</h1>
           <p>
-            Budget heads now follow the ECE admin spreadsheet format, including
-            sanctioned amount, description, utilisation and purchase purpose.
+            Maintain accumulated-income entries, purchase purposes and invoice
+            proof under each budget head.
           </p>
         </div>
         <div className="status-panel">
-          <span className="status-label">Filtered Budget</span>
-          <strong>{currency.format(totalBudget)}</strong>
+          <span className="status-label">
+            Remaining Amount ·{" "}
+            {financialYearFilter === "all"
+              ? "All Financial Years"
+              : `FY ${financialYearFilter}`}
+          </span>
+          <strong>{currency.format(totalRemaining)}</strong>
           <p>
-            {totalUtilisedLakh.toFixed(2)} lakhs utilised |{" "}
-            {currency.format(totalRemaining)} remaining
+            Budget {currency.format(totalBudget)} | Utilized{" "}
+            {currency.format(totalUtilized)}
           </p>
         </div>
       </section>
 
       {isAdmin && (
-        <section className="panel">
+        <section className="panel" ref={formSectionRef}>
           <div className="section-heading">
-            <h2>{editingId ? "Edit Budget Head" : "Add Budget Head"}</h2>
+            <h2>{editingId ? "Edit Income Entry" : "Add Income Entry"}</h2>
             <p>
-              Use the same columns as the shared Excel sheet. Invoice/document
-              upload is optional for existing template rows.
+              Search for an existing budget head or enter a new one. Existing
+              approved amounts load automatically for the entry date&apos;s
+              financial year.
             </p>
           </div>
 
           <form className="form-grid" onSubmit={saveIncomeRecord}>
             <label>
-              Financial Year
-              <select
+              Entry Date
+              <input
                 required
-                name="financialYear"
-                value={form.financialYear}
+                type="date"
+                name="date"
+                value={form.date}
                 onChange={updateField}
-              >
-                <option>2025-2026</option>
-                <option>2026-2027</option>
-                <option>2027-2028</option>
-              </select>
+              />
+              {form.date && (
+                <span className="field-hint">
+                  Financial year: {getFinancialYear(form.date)}
+                </span>
+              )}
             </label>
             <label>
               Budget Head
-              <input
-                required
-                name="budgetHead"
-                value={form.budgetHead}
-                onChange={updateField}
-                placeholder="End-to-End Testbed on Beyond 5G"
-              />
+              <div className="budget-head-combobox">
+                <input
+                  required
+                  disabled={!form.date}
+                  autoComplete="off"
+                  name="budgetHead"
+                  value={form.budgetHead}
+                  onChange={(event) => {
+                    updateField(event);
+                    setShowHeadSuggestions(true);
+                  }}
+                  onFocus={() => setShowHeadSuggestions(true)}
+                  onBlur={() => setShowHeadSuggestions(false)}
+                  placeholder={
+                    form.date
+                      ? "Search or enter a new budget head"
+                      : "Select entry date first"
+                  }
+                  role="combobox"
+                  aria-expanded={showHeadSuggestions}
+                  aria-controls="income-head-suggestions"
+                />
+                {showHeadSuggestions && matchingBudgetHeads.length > 0 && (
+                  <div
+                    className="budget-head-suggestions"
+                    id="income-head-suggestions"
+                    role="listbox"
+                  >
+                    {matchingBudgetHeads.map((head) => (
+                      <button
+                        type="button"
+                        role="option"
+                        key={head}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => selectBudgetHead(head)}
+                      >
+                        {head}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </label>
             <label>
-              Amount Display Text
+              Total Amount Approved (INR)
               <input
                 required
-                name="amountText"
-                value={form.amountText}
-                onChange={updateField}
-                placeholder="₹50 Lakhs"
-              />
-            </label>
-            <label>
-              Amount in INR
-              <input
-                required
+                readOnly={isExistingBudgetHead}
                 min="1"
-                type="number"
-                name="amount"
-                value={form.amount}
+                step="1"
+                type={isExistingBudgetHead ? "text" : "number"}
+                name="approvedAmount"
+                value={
+                  isExistingBudgetHead && form.approvedAmount
+                    ? inrNumber.format(Number(form.approvedAmount))
+                    : form.approvedAmount
+                }
                 onChange={updateField}
-                placeholder="5000000"
+                placeholder={
+                  isExistingBudgetHead
+                    ? "Loaded automatically"
+                    : "Enter approved amount"
+                }
               />
             </label>
             <label>
-              Utilised Amount (in lakhs)
+              Total Utilized Amount (INR)
+              <input
+                readOnly
+                value={
+                  form.budgetHead
+                    ? inrNumber.format(calculatedTotalUtilized)
+                    : ""
+                }
+                placeholder="Calculated automatically"
+              />
+            </label>
+            <label>
+              New Entry Amount (INR)
               <input
                 required
                 min="0"
-                step="0.00001"
+                step="1"
                 type="number"
-                name="utilisedAmountLakh"
-                value={form.utilisedAmountLakh}
+                name="utilizedAmount"
+                value={form.utilizedAmount}
                 onChange={updateField}
-                placeholder="5.07933"
+                placeholder="Enter this entry's amount"
               />
             </label>
-            <label className="span-two">
-              Description
-              <textarea
-                required
-                name="description"
-                value={form.description}
-                onChange={updateField}
-                placeholder="Hardware for Beyond 5G..."
+            <label>
+              Remaining Amount (INR)
+              <input
+                readOnly
+                value={
+                  form.approvedAmount
+                    ? inrNumber.format(calculatedRemainingAmount)
+                    : ""
+                }
+                placeholder="Calculated automatically"
               />
             </label>
             <label>
@@ -293,6 +507,16 @@ function Invoices({ isAdmin, records, onCreate, onUpdate, onDelete }) {
                 value={form.purchasesFor}
                 onChange={updateField}
                 placeholder="Panel & Camera"
+              />
+            </label>
+            <label className="span-two">
+              Description
+              <textarea
+                required
+                name="description"
+                value={form.description}
+                onChange={updateField}
+                placeholder="Describe this utilization entry"
               />
             </label>
             <label>
@@ -309,15 +533,20 @@ function Invoices({ isAdmin, records, onCreate, onUpdate, onDelete }) {
                 {saving
                   ? "Saving..."
                   : editingId
-                    ? "Update Budget Head"
-                    : "Save Budget Head"}
+                    ? "Update Income Entry"
+                    : "Save Income Entry"}
               </button>
               {editingId && (
-                <button className="secondary-button" type="button" onClick={cancelEdit}>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={cancelEdit}
+                >
                   Cancel Edit
                 </button>
               )}
             </div>
+            {success && <p className="form-success span-two">{success}</p>}
             {error && <p className="form-error span-two">{error}</p>}
           </form>
         </section>
@@ -326,11 +555,11 @@ function Invoices({ isAdmin, records, onCreate, onUpdate, onDelete }) {
       <section className="panel">
         <div className="section-toolbar">
           <div className="section-heading">
-            <h2>Accumulated Budget Heads</h2>
+            <h2>Accumulated Income Budget Heads</h2>
             <p>
               {isAdmin
-                ? "Search, export, edit, or delete official budget-head rows."
-                : "Search and export official budget-head rows."}
+                ? "Each budget head appears once per financial year. Click a head to view, edit, or delete its entries."
+                : "Each budget head appears once per financial year. Click a head to view its entries."}
             </p>
           </div>
           <button className="secondary-button" type="button" onClick={exportRows}>
@@ -348,6 +577,20 @@ function Invoices({ isAdmin, records, onCreate, onUpdate, onDelete }) {
             />
           </label>
           <label>
+            Budget Head
+            <select
+              value={headFilter}
+              onChange={(event) => setHeadFilter(event.target.value)}
+            >
+              <option value="all">All budget heads</option>
+              {budgetHeadOptions.map((head) => (
+                <option key={head} value={head}>
+                  {head}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
             Financial Year
             <select
               value={financialYearFilter}
@@ -359,98 +602,115 @@ function Invoices({ isAdmin, records, onCreate, onUpdate, onDelete }) {
               ))}
             </select>
           </label>
-          <label>
-            Invoice
-            <select
-              value={invoiceFilter}
-              onChange={(event) => setInvoiceFilter(event.target.value)}
-            >
-              <option value="all">All invoice states</option>
-              <option value="attached">Invoice attached</option>
-              <option value="missing">Invoice missing</option>
-            </select>
-          </label>
-          <label>
-            Utilisation
-            <select
-              value={utilisationFilter}
-              onChange={(event) => setUtilisationFilter(event.target.value)}
-            >
-              <option value="all">All utilization</option>
-              <option value="utilised">Utilised</option>
-              <option value="not-utilised">Not utilised</option>
-              <option value="remaining">Has remaining amount</option>
-            </select>
-          </label>
-          <label>
-            Min Amount
-            <input
-              min="0"
-              type="number"
-              value={minAmount}
-              onChange={(event) => setMinAmount(event.target.value)}
-              placeholder="0"
-            />
-          </label>
-          <label>
-            Max Amount
-            <input
-              min="0"
-              type="number"
-              value={maxAmount}
-              onChange={(event) => setMaxAmount(event.target.value)}
-              placeholder="5000000"
-            />
-          </label>
         </div>
 
         <div className="table-wrap">
-          <table>
+          <table className="budget-head-table">
             <thead>
               <tr>
-                <th>S.N.</th>
-                <th>FY</th>
+                <th>S. N.</th>
                 <th>Budget Head</th>
-                <th>Amount</th>
-                <th>Description</th>
-                <th>Utilised Amount (in lakhs)</th>
-                <th>Remaining Amount</th>
-                <th>Purchases for</th>
-                <th>Invoice</th>
-                {isAdmin && <th>Actions</th>}
+                <th>Total Amount Approved (INR)</th>
+                <th>Utilized (INR)</th>
+                <th>Remaining (INR)</th>
+                <th>Entries</th>
               </tr>
             </thead>
             <tbody>
-              {filteredRecords.map((record, index) => (
-                <tr key={record.id}>
-                  <td>{index + 1}</td>
-                  <td>{record.financialYear || "2025-2026"}</td>
-                  <td>{record.budgetHead || record.source}</td>
-                  <td>{record.amountText || currency.format(record.amount)}</td>
-                  <td>{record.description || record.notes}</td>
-                  <td>{Number(record.utilisedAmountLakh || 0).toFixed(5)}</td>
-                  <td>{currency.format(getRemainingAmount(record))}</td>
-                  <td>{record.purchasesFor}</td>
-                  <td>
-                    <InvoiceLink record={record} />
-                  </td>
-                  {isAdmin && (
-                    <td>
-                      <div className="table-actions">
-                        <button type="button" onClick={() => editRecord(record)}>
-                          Edit
+              {groupedBudgetHeads.map((group, index) => {
+                const isExpanded = expandedHeads.has(group.key);
+
+                return (
+                  <Fragment key={group.key}>
+                    <tr className="budget-head-row">
+                      <td>{index + 1}</td>
+                      <td>
+                        <button
+                          className="budget-head-toggle"
+                          type="button"
+                          aria-expanded={isExpanded}
+                          onClick={() => toggleBudgetHead(group.key)}
+                        >
+                          <span className="expand-icon" aria-hidden="true">
+                            {isExpanded ? "▾" : "▸"}
+                          </span>
+                          <span>{group.head}</span>
                         </button>
-                        <button type="button" onClick={() => deleteIncomeRecord(record)}>
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  )}
-                </tr>
-              ))}
-              {filteredRecords.length === 0 && (
+                      </td>
+                      <td>{inrNumber.format(group.approvedAmount)}</td>
+                      <td>{inrNumber.format(group.utilizedAmount)}</td>
+                      <td>{inrNumber.format(group.remainingAmount)}</td>
+                      <td>{group.entries.length}</td>
+                    </tr>
+                    {isExpanded && (
+                      <tr className="budget-entry-detail">
+                        <td colSpan="6">
+                          <div className="nested-table-wrap">
+                            <table>
+                              <thead>
+                                <tr>
+                                  <th>S. N.</th>
+                                  <th>Date</th>
+                                  <th>Description</th>
+                                  <th>Purchases For</th>
+                                  <th>Utilized (INR)</th>
+                                  <th>Invoice</th>
+                                  {isAdmin && <th>Actions</th>}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {group.entries.map((record, entryIndex) => (
+                                  <tr key={record.id}>
+                                    <td>{entryIndex + 1}</td>
+                                    <td>{record.date || "Not recorded"}</td>
+                                    <td>
+                                      {record.description ||
+                                        record.notes ||
+                                        "No description"}
+                                    </td>
+                                    <td>{record.purchasesFor || "—"}</td>
+                                    <td>
+                                      {inrNumber.format(
+                                        getUtilizedAmount(record),
+                                      )}
+                                    </td>
+                                    <td>
+                                      <InvoiceLink record={record} />
+                                    </td>
+                                    {isAdmin && (
+                                      <td>
+                                        <div className="table-actions">
+                                          <button
+                                            type="button"
+                                            onClick={() => editRecord(record)}
+                                          >
+                                            Edit
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              deleteIncomeRecord(record)
+                                            }
+                                          >
+                                            Delete
+                                          </button>
+                                        </div>
+                                      </td>
+                                    )}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
+              {groupedBudgetHeads.length === 0 && (
                 <tr>
-                  <td colSpan={isAdmin ? 10 : 9}>No budget heads found.</td>
+                  <td colSpan="6">No budget heads found.</td>
                 </tr>
               )}
             </tbody>
